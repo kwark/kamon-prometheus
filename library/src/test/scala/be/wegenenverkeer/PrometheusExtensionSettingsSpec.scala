@@ -1,6 +1,7 @@
-package com.monsanto.arch.kamon.prometheus
+package be.wegenenverkeer
 
 import akka.ConfigurationException
+import com.monsanto.arch.kamon.prometheus.{KamonTestKit, PrometheusSettings}
 import com.typesafe.config.ConfigFactory
 import kamon.Kamon
 import org.scalatest.{Matchers, WordSpec}
@@ -9,29 +10,14 @@ import scala.concurrent.duration.DurationInt
 
 /** Tests that the Prometheus extension is correctly getting its configuration.
   *
-  * @author Daniel Solano Gómez
   */
 class PrometheusExtensionSettingsSpec extends WordSpec with Matchers {
   import PrometheusExtensionSettingsSpec._
 
-  /** Stops Kamon after each test. */
-  override def withFixture(test: NoArgTest) = {
-    try {
-      super.withFixture(test)
-    } finally {
-      try {
-        Kamon.shutdown()
-      } catch {
-        case _: NullPointerException ⇒ // occurs if Kamon did not start
-      }
-    }
-  }
-
   "the Prometheus extension" when {
     "loading settings" should {
       "load the default configuration" in {
-        Kamon.start(NoKamonLoggingConfig)
-        val settings = Kamon.extension(Prometheus).settings
+        val settings = new PrometheusSettings(ConfigFactory.load())
 
         settings.refreshInterval shouldBe 1.minute
         settings.subscriptions shouldBe DefaultSubscriptions
@@ -41,34 +27,33 @@ class PrometheusExtensionSettingsSpec extends WordSpec with Matchers {
       "reject configurations where the refresh interval is too short" in {
         val config = ConfigFactory.parseString("kamon.prometheus.refresh-interval = 30 milliseconds")
 
-        Kamon.start(config.withFallback(NoKamonLoggingConfig))
         the [ConfigurationException] thrownBy {
-          Kamon(Prometheus)
+          new PrometheusSettings(config.withFallback(ConfigFactory.load()))
         } should have message "The Prometheus refresh interval (30 milliseconds) must be equal to or greater than the Kamon tick interval (10 seconds)"
       }
 
       "respect a refresh interval setting" in {
         val config = ConfigFactory.parseString("kamon.prometheus.refresh-interval = 1000.days")
-        Kamon.start(config.withFallback(NoKamonLoggingConfig))
-        Kamon(Prometheus).settings.refreshInterval shouldBe 1000.days
+        val settings = new PrometheusSettings(config.withFallback(ConfigFactory.load()))
+        settings.refreshInterval shouldBe 1000.days
       }
 
       "respect an overridden subscription setting" in {
         val config = ConfigFactory.parseString("kamon.prometheus.subscriptions.counter = [ \"foo\" ]")
-        Kamon.start(config.withFallback(NoKamonLoggingConfig))
-        Kamon(Prometheus).settings.subscriptions shouldBe DefaultSubscriptions.updated("counter", List("foo"))
+        val settings = new PrometheusSettings(config.withFallback(ConfigFactory.load()))
+        settings.subscriptions shouldBe DefaultSubscriptions.updated("counter", List("foo"))
       }
 
       "respect an additional subscription setting" in {
         val config = ConfigFactory.parseString("kamon.prometheus.subscriptions.foo = [ \"bar\" ]")
-        Kamon.start(config.withFallback(NoKamonLoggingConfig))
-        Kamon(Prometheus).settings.subscriptions shouldBe DefaultSubscriptions + ("foo" → List("bar"))
+        val settings = new PrometheusSettings(config.withFallback(ConfigFactory.load()))
+        settings.subscriptions shouldBe DefaultSubscriptions + ("foo" → List("bar"))
       }
 
       "respect configured labels" in {
         val config = ConfigFactory.parseString("kamon.prometheus.labels.foo = \"bar\"")
-        Kamon.start(config.withFallback(NoKamonLoggingConfig))
-        Kamon(Prometheus).settings.labels shouldBe Map("foo" → "bar")
+        val settings = new PrometheusSettings(config.withFallback(ConfigFactory.load()))
+        settings.labels shouldBe Map("foo" → "bar")
       }
     }
 
@@ -79,11 +64,13 @@ class PrometheusExtensionSettingsSpec extends WordSpec with Matchers {
             |kamon.metric.tick-interval = 2 minutes
           """.stripMargin).withFallback(NoKamonLoggingConfig)
 
-        Kamon.start(config)
+        KamonTestKit.resetKamon(config)
+        Kamon.start()
+        val extension = KamonTestKit.kamonActorSystem().registerExtension(PrometheusPlay)
 
-        val extension = Kamon.extension(Prometheus)
         extension.isBuffered shouldBe true
         extension.listener should not be theSameInstanceAs(extension.buffer)
+
       }
 
       "not buffer when the refresh interval is the same as the tick interval" in {
@@ -92,9 +79,10 @@ class PrometheusExtensionSettingsSpec extends WordSpec with Matchers {
             |kamon.metric.tick-interval = 42 days
           """.stripMargin).withFallback(NoKamonLoggingConfig)
 
-        Kamon.start(config)
+        KamonTestKit.resetKamon(config)
+        Kamon.start()
+        val extension = KamonTestKit.kamonActorSystem().registerExtension(PrometheusPlay)
 
-        val extension = Kamon.extension(Prometheus)
         extension.isBuffered shouldBe false
         extension.listener shouldBe theSameInstanceAs(extension.buffer)
       }
@@ -123,7 +111,6 @@ object PrometheusExtensionSettingsSpec {
     "akka-dispatcher" → List("**"),
     "akka-router" → List("**"),
     "system-metric" → List("**"),
-    "http-server" → List("**"),
-    "spray-can-server" → List("**")
+    "http-server" → List("**")
   )
 }

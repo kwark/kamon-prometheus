@@ -1,17 +1,17 @@
-package com.monsanto.arch.kamon.prometheus
+package be.wegenenverkeer
 
 import akka.actor.{Actor, Props}
 import akka.event.Logging
 import kamon.metric.SubscriptionsDispatcher.TickMetricSnapshot
 
 /** An actor that receives messages from Kamon and updates the endpoint with the latest snapshot. */
-class PrometheusListener(endpoint: PrometheusEndpoint) extends Actor {
+class PrometheusListener(snapshotListener: SnapshotListener) extends Actor {
   private val log = Logging(context.system, this)
 
   override def receive = {
     case tick: TickMetricSnapshot => {
       log.debug(s"Got a tick: $tick")
-      endpoint.updateSnapShot(tick)
+      snapshotListener.updateSnapShot(tick)
     }
     case x => {
       log.warning(s"Got an $x")
@@ -20,5 +20,5 @@ class PrometheusListener(endpoint: PrometheusEndpoint) extends Actor {
 }
 object PrometheusListener {
   /** Provides the props to create a new PrometheusListener. */
-  def props(endpoint: PrometheusEndpoint): Props = Props(new PrometheusListener(endpoint))
+  def props(snapshotListener: SnapshotListener): Props = Props(new PrometheusListener(snapshotListener))
 }

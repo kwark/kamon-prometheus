@@ -1,24 +1,22 @@
 package com.monsanto.arch.kamon.prometheus.demo
 
-import akka.actor.{ActorLogging, Actor, Cancellable, Props}
-import akka.event.Logging
+import akka.actor.{Actor, Cancellable, Props}
 import akka.routing._
-import spray.http.Uri
+import be.wegenenverkeer.rxhttp.scala.RxHttpClient
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 /** Generates load using a router and a pool of workers.
   *
-  * @param baseUri the base URI where the server is listening
+  * @param demoClient
   *
-  * @author Daniel Solano Gómez
   */
-class LoadGenerator(baseUri: Uri) extends Actor {
+class LoadGenerator(demoClient: RxHttpClient) extends Actor {
   import LoadGenerator.Message._
   import LoadGenerator._
 
   /** The router that sends requests off to workers. */
-  private val worker = context.actorOf(RoundRobinPool(RouteeCount).props(LoadGeneratorWorker.props(baseUri, self)), "router")
+  private val worker = context.actorOf(RoundRobinPool(RouteeCount).props(LoadGeneratorWorker.props(demoClient, self)), "router")
   /** Keep track of scheduled tasks so that they can be cancelled when necessary. */
   var waiters = List.empty[Cancellable]
 
@@ -65,7 +63,7 @@ class LoadGenerator(baseUri: Uri) extends Actor {
 }
 
 object LoadGenerator {
-  def props(baseUri: Uri): Props = Props(new LoadGenerator(baseUri))
+  def props(demoClient: RxHttpClient): Props = Props(new LoadGenerator(demoClient))
 
   /** The desired number of routees */
   val RouteeCount = 5

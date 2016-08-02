@@ -1,21 +1,24 @@
 import java.util.Date
 import sbtprotobuf.ProtobufPlugin
 
-val akkaVersion = "2.3.14"
-val sprayVersion = "1.3.3"
-val kamonVersion = "0.5.2"
+val akkaVersion = "2.4.7"
+val kamonVersion = "0.6.1"
+val playVersion = "2.5.4"
 
 lazy val commonSettings = Seq(
-  homepage := Some(url("https://monsantoco.github.io/kamon-prometheus")),
-  organization := "com.monsanto.arch",
-  organizationHomepage := Some(url("http://engineering.monsanto.org")),
+  organization := "be.wegenenverkeer",
   licenses := Seq("BSD New" → url("http://opensource.org/licenses/BSD-3-Clause")),
-  scalaVersion := "2.11.7",
+  scalaVersion := "2.11.8",
   scalacOptions ++= Seq(
     "-deprecation",
     "-unchecked"
   ),
-  resolvers += Resolver.jcenterRepo,
+  resolvers ++= Seq(
+    "AWV nexus releases" at "https://collab.mow.vlaanderen.be/nexus/content/repositories/releases",
+    "AWV nexus snapshot" at "https://collab.mow.vlaanderen.be/nexus/content/repositories/snapshots",
+    Resolver.typesafeRepo("releases")
+  ),
+  credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
   apiMappingsScala ++= Map(
     ("com.typesafe.akka", "akka-actor") → "http://doc.akka.io/api/akka/%s",
     ("io.spray", "spray-routing") → "http://spray.io/documentation/1.1-SNAPSHOT/api/"
@@ -25,24 +28,17 @@ lazy val commonSettings = Seq(
   )
 )
 
-val bintrayPublishing = Seq(
-  bintrayOrganization := Some("monsanto"),
-  bintrayPackageLabels := Seq("kamon", "prometheus", "metrics"),
-  bintrayVcsUrl := Some("https://github.com/MonsantoCo/kamon-prometheus"),
-  publishTo := {
-    if (isSnapshot.value) Some("OJO Snapshots" at s"https://oss.jfrog.org/artifactory/oss-snapshot-local;build.timestamp=${new Date().getTime}")
-    else publishTo.value
+lazy val publishSettings: Seq[Setting[_]] = Seq(
+  publishTo <<= version { (v: String) =>
+    val nexus = "https://collab.mow.vlaanderen.be/nexus/content/repositories/"
+    if (v.trim.endsWith("SNAPSHOT"))
+      Some("collab snapshots" at nexus + "snapshots")
+    else
+      Some("collab releases" at nexus + "releases")
   },
-  credentials ++= {
-    List(bintrayCredentialsFile.value)
-      .filter(_.exists())
-      .map(f ⇒ Credentials.toDirect(Credentials(f)))
-      .map(c ⇒ Credentials("Artifactory Realm", "oss.jfrog.org", c.userName, c.passwd))
-  },
-  bintrayReleaseOnPublish := {
-    if (isSnapshot.value) false
-    else bintrayReleaseOnPublish.value
-  }
+  //    publishMavenStyle := true,
+  publishArtifact in Compile := true,
+  publishArtifact in Test := true
 )
 
 val noPublishing = Seq(
@@ -54,23 +50,23 @@ val noPublishing = Seq(
 lazy val library = (project in file("library"))
   .disablePlugins(sbtassembly.AssemblyPlugin)
   .settings(commonSettings: _*)
-  .settings(bintrayPublishing: _*)
+  .settings(publishSettings: _*)
   .settings(ProtobufPlugin.protobufSettings: _*)
   .settings(
     name := "kamon-prometheus",
     description := "Kamon module to export metrics to Prometheus",
     libraryDependencies ++= Seq(
       "io.kamon"               %% "kamon-core"               % kamonVersion,
-      "io.spray"               %% "spray-routing"            % sprayVersion,
+      "com.typesafe.play"      %% "play"                     % playVersion,
       "com.typesafe.akka"      %% "akka-actor"               % akkaVersion,
       "com.typesafe"            % "config"                   % "1.3.0",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.4" % "provided",
       // -- testing --
-      "org.scalatest"     %% "scalatest"     % "2.2.5"      % "test",
-      "com.typesafe.akka" %% "akka-testkit"  % akkaVersion  % "test",
-      "io.spray"          %% "spray-testkit" % sprayVersion % "test",
-      "org.scalacheck"    %% "scalacheck"    % "1.12.5"     % "test",
-      "io.kamon"          %% "kamon-akka"    % kamonVersion % "test"
+      "com.typesafe.play" %% "play-test"       % playVersion  % "test",
+      "org.scalatest"     %% "scalatest"       % "2.2.5"      % "test",
+      "com.typesafe.akka" %% "akka-testkit"    % akkaVersion  % "test",
+      "org.scalacheck"    %% "scalacheck"      % "1.12.5"     % "test",
+      "io.kamon"          %% "kamon-akka"      % kamonVersion % "test"
     ),
     dependencyOverrides ++= Set(
       "org.scala-lang"          % "scala-library" % scalaVersion.value,
@@ -95,14 +91,23 @@ lazy val demo = (project in file("demo"))
     name := "kamon-prometheus-demo",
     description := "Docker image containing a demonstration of kamon-prometheus in action.",
     libraryDependencies ++= Seq(
-      "io.kamon"          %% "kamon-spray"          % kamonVersion,
       "io.kamon"          %% "kamon-system-metrics" % kamonVersion,
-      "io.spray"          %% "spray-can"            % sprayVersion,
-      "com.monsanto.arch" %% "spray-kamon-metrics"  % "0.1.2"
+      ("io.kamon"          %% "kamon-play-25"       % kamonVersion).exclude("org.asynchttpclient", "async-http-client").exclude("commons-logging", "commons-logging"),
+      "io.kamon"          %% "kamon-autoweave"      % kamonVersion,
+      "be.wegenenverkeer" %% "rxhttpclient-scala"   % "0.4.0",
+      "com.typesafe.play" %% "play-netty-server"    % playVersion,
+      "com.typesafe.play" %% "play-logback"         % playVersion
     ),
     fork in run := true,
     javaOptions in run <++= AspectjKeys.weaverOptions in Aspectj,
     javaOptions in reStart <++= AspectjKeys.weaverOptions in Aspectj,
+    assemblyMergeStrategy in assembly := {
+      case PathList("org", "aspectj", xs @ _*)         => MergeStrategy.last
+      case PathList(ps @ _*) if ps.last == "io.netty.versions.properties"                => MergeStrategy.first
+      case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+    },
     assemblyJarName in assembly <<= (name, version) map { (name, version) ⇒ s"$name-$version.jar" },
     docker <<= docker.dependsOn(assembly),
     imageName in docker := ImageName(
@@ -127,7 +132,7 @@ lazy val demo = (project in file("demo"))
       val grafanaPluginsHash = "27f1398b497650f5b10b983ab9507665095a71b3"
 
       val instructions = Seq(
-        From("java:8-jre"),
+        From("java:8-jdk"),
         WorkDir("/tmp"),
         Raw("RUN", Seq(
           // install supervisor
@@ -159,7 +164,7 @@ lazy val demo = (project in file("demo"))
         Copy(CopyFile(grafanaIni), "/etc/grafana/grafana.ini"),
         Copy(CopyFile(grafanaDb), "/var/lib/grafana/grafana.db"),
         // expose ports
-        Expose(Seq(80, 3000, 9090))
+        Expose(Seq(9000, 3000, 9090))
       )
       sbtdocker.immutable.Dockerfile(instructions)
     },
@@ -183,5 +188,3 @@ lazy val `kamon-prometheus` = (project in file("."))
   .aggregate(library, demo)
   .settings(commonSettings: _*)
   .settings(noPublishing: _*)
-  .settings(siteSettings: _*)
-  .settings(ghPagesSettings: _*)

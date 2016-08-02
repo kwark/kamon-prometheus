@@ -1,13 +1,16 @@
 package com.monsanto.arch.kamon.prometheus
 
+import akka.actor.ActorSystem
 import com.monsanto.arch.kamon.prometheus.KamonTestKit.TestCurrentValueCollector
-import com.typesafe.config.ConfigFactory
-import kamon.Kamon
+import com.typesafe.config.{Config, ConfigFactory}
+import kamon.{ConfigProvider, Kamon}
 import kamon.metric.SubscriptionsDispatcher.TickMetricSnapshot
-import kamon.metric.instrument.{UnitOfMeasurement, CollectionContext, Gauge}
-import kamon.metric.{Entity, SingleInstrumentEntityRecorder, SubscriptionsDispatcher}
+import kamon.metric.instrument.{CollectionContext, Gauge, UnitOfMeasurement}
+import kamon.metric._
 import kamon.util.{LazyActorRef, MilliTimestamp}
 import org.scalatest.Suite
+
+import scala.collection.concurrent.TrieMap
 
 /** Utilities for testing with Kamon.
   *
@@ -70,25 +73,16 @@ trait KamonTestKit extends Suite {
 
   /** Starts and stops Kamon around each test. */
   override def withFixture(test: NoArgTest) = {
-    val config = KamonTestKit.TestConfig.withFallback(ConfigFactory.load())
-    Kamon.start(config)
+    val config = ConfigFactory.load()
+    Kamon.start()
     try {
       super.withFixture(test)
     } finally {
       Kamon.shutdown()
+      KamonTestKit.resetKamon(config)
     }
   }
 
-  /** Forcibly flushes all subscriptions.
-    *
-    * Taken from https://github.com/kamon-io/Kamon/blob/57dd25e3afbfc2682b81c07161850104f32fd841/kamon-core/src/test/scala/kamon/testkit/BaseKamonSpec.scala#L54
-    */
-  def flushSubscriptions(): Unit = {
-    val subscriptionsField = Kamon.metrics.getClass.getDeclaredField("_subscriptions")
-    subscriptionsField.setAccessible(true)
-    val subscriptions = subscriptionsField.get(Kamon.metrics).asInstanceOf[LazyActorRef]
-    subscriptions.tell(SubscriptionsDispatcher.Tick)
-  }
 }
 
 object KamonTestKit {
@@ -120,6 +114,72 @@ object KamonTestKit {
       |  }
       |}
     """.stripMargin)
+
+  def kamonActorSystem(): ActorSystem = {
+    val systemField = Kamon.getClass.getDeclaredField("_system")
+    systemField.setAccessible(true)
+    systemField.get(Kamon).asInstanceOf[ActorSystem]
+  }
+
+  def resetKamon(config: Config): Unit = {
+    resetConfig(config)
+    resetMetrics(config)
+    resetActorSystem(config)
+
+    val bitmapField = Kamon.getClass.getDeclaredField("bitmap$0")
+    bitmapField.setAccessible(true)
+    bitmapField.set(Kamon, 0.toByte)
+
+  }
+
+  def resetConfig(config: Config): Unit =  {
+    val systemField = Kamon.getClass.getDeclaredField("config")
+    systemField.setAccessible(true)
+    systemField.set(Kamon, config)
+  }
+
+  def resetMetrics(config: Config): Unit = {
+    val trackedEntitiesField = Kamon.metrics.getClass.getDeclaredField("_trackedEntities")
+    trackedEntitiesField.setAccessible(true)
+    trackedEntitiesField.set(Kamon.metrics, TrieMap.empty[Entity, EntityRecorder])
+
+    val settingsField = Kamon.metrics.getClass.getDeclaredField("settings")
+    settingsField.setAccessible(true)
+    settingsField.set(Kamon.metrics, MetricsSettings(config))
+
+    val subscriptionsField = Kamon.metrics.getClass.getDeclaredField("_subscriptions")
+    subscriptionsField.setAccessible(true)
+    subscriptionsField.set(Kamon.metrics, new LazyActorRef)
+
+    val bitmapField = Kamon.metrics.getClass.getDeclaredField("bitmap$0")
+    bitmapField.setAccessible(true)
+    bitmapField.set(Kamon.metrics, false)
+  }
+
+  def resetActorSystem(config: Config): Unit = {
+    val patchedConfig = config
+      .withoutPath("akka")
+      .withoutPath("spray")
+      .withFallback(config.getConfig("kamon.internal-config"))
+
+    val system = ActorSystem("kamon", patchedConfig)
+
+    val systemField = Kamon.getClass.getDeclaredField("_system")
+    systemField.setAccessible(true)
+    systemField.set(Kamon, system)
+  }
+
+  /** Forcibly flushes all subscriptions.
+    *
+    * Taken from https://github.com/kamon-io/Kamon/blob/57dd25e3afbfc2682b81c07161850104f32fd841/kamon-core/src/test/scala/kamon/testkit/BaseKamonSpec.scala#L54
+    */
+  def flushSubscriptions(): Unit = {
+    val subscriptionsField = Kamon.metrics.getClass.getDeclaredField("_subscriptions")
+    subscriptionsField.setAccessible(true)
+    val subscriptions = subscriptionsField.get(Kamon.metrics).asInstanceOf[LazyActorRef]
+    subscriptions.tell(SubscriptionsDispatcher.Tick)
+  }
+
 
   /** Gauge current value recorder implementation that will provide all of the values in a list and then repeat the
     * last value.  The default value is zero.

@@ -6,7 +6,7 @@ import akka.kamon.instrumentation.AkkaDispatcherMetrics
 import com.monsanto.arch.kamon.prometheus.converter.SnapshotConverter.{KamonCategoryLabel, KamonNameLabel}
 import com.monsanto.arch.kamon.prometheus.metric.PrometheusType.Counter
 import com.monsanto.arch.kamon.prometheus.metric._
-import com.monsanto.arch.kamon.prometheus.{KamonTestKit, Prometheus, PrometheusGen, PrometheusSettings}
+import com.monsanto.arch.kamon.prometheus.{KamonTestKit, PrometheusGen, PrometheusSettings}
 import com.typesafe.config.ConfigFactory
 import kamon.Kamon
 import kamon.akka.{ActorMetrics, RouterMetrics}
@@ -28,7 +28,7 @@ class SnapshotConverterSpec extends WordSpec with KamonTestKit with Matchers wit
 
   def are = afterWord("are")
 
-  def converter = new SnapshotConverter(Kamon(Prometheus).settings)
+  def converter = new SnapshotConverter(new PrometheusSettings(ConfigFactory.load()))
 
   "a snapshot converter" should handle {
     "empty ticks" in {
@@ -1375,10 +1375,12 @@ object SnapshotConverterSpec {
   case object Joules extends UnitOfMeasurement {
     override val name = "energy"
     override val label = "J"
+    override protected def canScale(toUnit: UnitOfMeasurement): Boolean = false
   }
 
   case object Celsius extends UnitOfMeasurement {
     override val name = "temperature"
     override val label = "°C"
+    override protected def canScale(toUnit: UnitOfMeasurement): Boolean = false
   }
 }

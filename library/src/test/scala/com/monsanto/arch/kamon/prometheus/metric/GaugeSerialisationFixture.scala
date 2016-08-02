@@ -2,7 +2,7 @@ package com.monsanto.arch.kamon.prometheus.metric
 
 import java.io.ByteArrayOutputStream
 
-import com.monsanto.arch.kamon.prometheus.converter.{SnapshotConverter, SnapshotConverterSpec}
+import com.monsanto.arch.kamon.prometheus.converter.SnapshotConverter
 import com.monsanto.arch.kamon.prometheus.proto.Metrics
 import kamon.metric.SingleInstrumentEntityRecorder
 import kamon.util.MilliTimestamp

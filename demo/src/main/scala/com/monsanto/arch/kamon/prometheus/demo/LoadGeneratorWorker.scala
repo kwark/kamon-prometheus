@@ -1,43 +1,47 @@
 package com.monsanto.arch.kamon.prometheus.demo
 
 import akka.actor.{Actor, ActorRef, Props}
-import akka.io.IO
-import spray.can.Http
-import spray.http.{HttpResponse, Uri}
-import spray.httpx.RequestBuilding.{Get, Post}
+import akka.pattern.pipe
+import be.wegenenverkeer.rxhttp.{ClientRequest, RxHttpClient, scala}
+import be.wegenenverkeer.rxhttp.scala.ImplicitConversions._
 
 /** Does the real work of generating load.
   *
-  * @param baseUri the base URI where the server is listening
-  *
-  * @author Daniel Solano Gómez
+  * @param demoClient the base URI where the server is listening
   */
-class LoadGeneratorWorker(baseUri: Uri, master: ActorRef) extends Actor {
+class LoadGeneratorWorker(demoClient: scala.RxHttpClient, master: ActorRef) extends Actor {
   import LoadGenerator.LoadType._
-  import context.system
+  import context.dispatcher
+
+  private case object Done
+
+  private def handleRequest(request: ClientRequest) = {
+    demoClient.execute(request, _ => Done) pipeTo self
+  }
 
   override def receive = {
     case t: LoadGenerator.LoadType ⇒
       t match {
         case IncrementCounter(x) ⇒
-          IO(Http) ! Post(baseUri.withPath(Uri.Path("/counter") / x.toString).toString())
+          handleRequest(demoClient.requestBuilder().setMethod("POST").setUrlRelativetoBase(s"/counter/${x.toString}").build())
         case GetRejection ⇒
-          IO(Http) ! Post(baseUri.withPath(Uri.Path("/counter/2000")).toString())
+          handleRequest(demoClient.requestBuilder().setMethod("POST").setUrlRelativetoBase("/counter/2000").build())
         case GetTimeout ⇒
-          IO(Http) ! Get(baseUri.withPath(Uri.Path("/timeout")).toString())
+          handleRequest(demoClient.requestBuilder().setUrlRelativetoBase("/timeout").build())
         case GetError ⇒
-          IO(Http) ! Get(baseUri.withPath(Uri.Path("/error")).toString())
+          handleRequest(demoClient.requestBuilder().setUrlRelativetoBase("/error").build())
         case UpdateHistogram ⇒
-          IO(Http) ! Post(baseUri.withPath(Uri.Path("/histogram")).toString())
+          handleRequest(demoClient.requestBuilder().setMethod("POST").setUrlRelativetoBase("/histogram").build())
         case UpdateMinMaxCounter ⇒
-          IO(Http) ! Post(baseUri.withPath(Uri.Path("/min-max-counter")).toString())
+          handleRequest(demoClient.requestBuilder().setMethod("POST").setUrlRelativetoBase("/min-max-counter").build())
       }
-    case _: HttpResponse ⇒
+    case Done ⇒
       LoadGenerator.bomb()
       master ! LoadGenerator.Message.LoadFinished
   }
+
 }
 
 object LoadGeneratorWorker {
-  def props(baseUri: Uri, master: ActorRef): Props = Props(new LoadGeneratorWorker(baseUri, master))
+  def props(demoClient: scala.RxHttpClient, master: ActorRef): Props = Props(new LoadGeneratorWorker(demoClient, master))
 }

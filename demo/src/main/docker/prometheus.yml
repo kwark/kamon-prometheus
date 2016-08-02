@@ -16,4 +16,4 @@ scrape_configs:
   - job_name: demo
     metrics_path: /metrics
     target_groups:
-      - targets: ['localhost:80']
+      - targets: ['localhost:9000']
