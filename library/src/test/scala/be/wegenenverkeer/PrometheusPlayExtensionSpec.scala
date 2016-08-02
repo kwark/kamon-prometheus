@@ -46,8 +46,7 @@ class PrometheusPlayExtensionSpec extends WordSpec with Results with Matchers wi
         "handle GET requests" in new WithData {
           val result: Result = extension.controller.metrics().apply(FakeRequest().withHeaders("Accept" -> "text/plain")).futureValue
           result.header.status shouldBe play.api.http.Status.OK
-          result.body.contentType.value.toString shouldBe "text/plain; charset=utf-8"
-          result.header.headers("version") shouldBe "0.0.4"
+          result.body.contentType.value.toString shouldBe "text/plain; version=0.0.4"
           val s = result.body.consumeData(ActorMaterializer()).map(bs => new String(bs.toArray)).futureValue
           (TextFormat.parse(s) should contain theSameElementsAs snapshot) (after being normalised)
           Kamon.shutdown()
@@ -61,9 +60,7 @@ class PrometheusPlayExtensionSpec extends WordSpec with Results with Matchers wi
         "handle GET requests" in new WithData {
           val result: Result = extension.controller.metrics().apply(FakeRequest().withHeaders("Accept" -> PrometheusController.ProtobufContentType)).futureValue
           result.header.status shouldBe play.api.http.Status.OK
-          result.body.contentType.value.toString shouldBe "application/octet-stream"
-          result.header.headers("proto") shouldBe "io.prometheus.client.MetricFamily"
-          result.header.headers("encoding") shouldBe "delimited"
+          result.body.contentType.value.toString shouldBe "application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited"
           val bytes = result.body.consumeData(ActorMaterializer()).map(bs => bs.toArray).futureValue
           (ProtoBufFormat.parse(bytes) should contain theSameElementsAs snapshot) (after being normalised)
           Kamon.shutdown()
