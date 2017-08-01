@@ -3,12 +3,12 @@ package com.monsanto.arch.kamon.prometheus
 import akka.actor.ActorSystem
 import com.monsanto.arch.kamon.prometheus.KamonTestKit.TestCurrentValueCollector
 import com.typesafe.config.{Config, ConfigFactory}
-import kamon.{ConfigProvider, Kamon}
+import kamon.Kamon
 import kamon.metric.SubscriptionsDispatcher.TickMetricSnapshot
 import kamon.metric.instrument.{CollectionContext, Gauge, UnitOfMeasurement}
 import kamon.metric._
 import kamon.util.{LazyActorRef, MilliTimestamp}
-import org.scalatest.Suite
+import org.scalatest.TestSuite
 
 import scala.collection.concurrent.TrieMap
 
@@ -16,7 +16,7 @@ import scala.collection.concurrent.TrieMap
   *
   * @author Daniel Solano Gómez
   */
-trait KamonTestKit extends Suite {
+trait KamonTestKit extends TestSuite {
   /** The start time of generated snapshots. */
   val start = MilliTimestamp.now
   /** The end time of generated snapshots. */
@@ -91,7 +91,7 @@ object KamonTestKit {
     * 1. It sets an absurdly long tick interval, allowing the tests to control when ticks occur.
     * 2. Makes the tests less chatty log-wise
     */
-  val TestConfig = ConfigFactory.parseString(
+  val TestConfig: Config = ConfigFactory.parseString(
     """kamon {
       |  metric {
       |    tick-interval = 1 hour
@@ -116,9 +116,9 @@ object KamonTestKit {
     """.stripMargin)
 
   def kamonActorSystem(): ActorSystem = {
-    val systemField = Kamon.getClass.getDeclaredField("_system")
+    val systemField = kamonInstance.getClass.getDeclaredField("actorSystem")
     systemField.setAccessible(true)
-    systemField.get(Kamon).asInstanceOf[ActorSystem]
+    systemField.get(kamonInstance).asInstanceOf[ActorSystem]
   }
 
   def resetKamon(config: Config): Unit = {
@@ -126,16 +126,22 @@ object KamonTestKit {
     resetMetrics(config)
     resetActorSystem(config)
 
-    val bitmapField = Kamon.getClass.getDeclaredField("bitmap$0")
-    bitmapField.setAccessible(true)
-    bitmapField.set(Kamon, 0.toByte)
+//    val bitmapField = Kamon.getClass.getDeclaredField("bitmap$0")
+//    bitmapField.setAccessible(true)
+//    bitmapField.set(Kamon, 0.toByte)
 
   }
 
   def resetConfig(config: Config): Unit =  {
-    val systemField = Kamon.getClass.getDeclaredField("config")
+    val systemField = kamonInstance.getClass.getDeclaredField("config")
     systemField.setAccessible(true)
-    systemField.set(Kamon, config)
+    systemField.set(kamonInstance, config)
+  }
+
+  private lazy val kamonInstance = {
+    val instanceField = Kamon.getClass.getDeclaredField("kamonInstance")
+    instanceField.setAccessible(true)
+    instanceField.get(Kamon)
   }
 
   def resetMetrics(config: Config): Unit = {
@@ -164,9 +170,9 @@ object KamonTestKit {
 
     val system = ActorSystem("kamon", patchedConfig)
 
-    val systemField = Kamon.getClass.getDeclaredField("_system")
+    val systemField = kamonInstance.getClass.getDeclaredField("actorSystem")
     systemField.setAccessible(true)
-    systemField.set(Kamon, system)
+    systemField.set(kamonInstance, system)
   }
 
   /** Forcibly flushes all subscriptions.
@@ -185,7 +191,7 @@ object KamonTestKit {
     * last value.  The default value is zero.
     */
   class TestCurrentValueCollector(values: Seq[Long]) extends Gauge.CurrentValueCollector {
-    val iterator = values.iterator
+    val iterator: Iterator[Long] = values.iterator
     var lastValue = 0L
 
     override def currentValue: Long = {

@@ -5,10 +5,18 @@ import com.monsanto.arch.kamon.prometheus.converter.SnapshotConverter
 import com.monsanto.arch.kamon.prometheus.metric.{ProtoBufFormat, TextFormat}
 import play.api.mvc._
 
+import scala.concurrent.ExecutionContext
+
 /** Manages the Play endpoint that Prometheus can use to scrape metrics.
   *
   */
-class PrometheusController(settings: PrometheusSettings) extends Controller with SnapshotListener {
+class PrometheusController(settings: PrometheusSettings,
+                           implicit val executionContext: ExecutionContext)
+  extends Rendering
+    with Results
+    with SnapshotListener {
+
+  val actionBuilder: ActionBuilder[Request, AnyContent] = DefaultActionBuilder(BodyParsers.utils.ignore(AnyContentAsEmpty: AnyContent))
 
   /** Converts snapshots from Kamon’s native type to the one used by this extension. */
   override val snapshotConverter = new SnapshotConverter(settings)
@@ -16,7 +24,7 @@ class PrometheusController(settings: PrometheusSettings) extends Controller with
   val AcceptsProtoBuf = Accepting(PrometheusController.ProtobufContentType)
   val AcceptsText = Accepting("text/plain")
 
-  def metrics = Action { implicit request =>
+  def metrics = actionBuilder { implicit request =>
     Option(snapshot.get) match {
       case Some(s) =>
         render {

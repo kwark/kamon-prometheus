@@ -33,7 +33,7 @@ class PrometheusPlayExtensionSpec extends WordSpec with Results with Matchers wi
       "returns an empty response" in {
         KamonTestKit.resetKamon(ConfigFactory.parseString("kamon.prometheus.refresh-interval = 10 seconds").withFallback(ConfigFactory.load()))
         Kamon.start()
-        val controller = new PrometheusController(new PrometheusSettings(ConfigFactory.load()))
+        val controller = new PrometheusController(new PrometheusSettings(ConfigFactory.load()), scala.concurrent.ExecutionContext.Implicits.global)
         val result: Future[Result] = controller.metrics().apply(FakeRequest())
         result.futureValue shouldBe NoContent
         Kamon.shutdown()

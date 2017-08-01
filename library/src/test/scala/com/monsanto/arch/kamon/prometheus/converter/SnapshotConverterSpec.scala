@@ -1191,49 +1191,49 @@ class SnapshotConverterSpec extends WordSpec with KamonTestKit with Matchers wit
     "Akka dispatcher metrics" which _have {
       import DefaultPostprocessor._
 
-      "a fork join pool" in {
-        val dispatcherName = "test-system/fork-join-pool"
-        val forkJoinPool =  new ForkJoinPool()
-        val tags: Map[String, String] = Map("dispatcher-type" → "fork-join-pool")
-        Kamon.metrics.entity(ForkJoinPoolMetrics.factory(forkJoinPool, AkkaDispatcherMetrics.Category),
-          dispatcherName, tags)
-        val entity = Entity(dispatcherName, "akka-dispatcher", tags)
-        val tick = snapshotOf(entity)
-        val result = converter(tick)
-        val labels = Map(
-          "dispatcher_type" → "fork-join-pool",
-          KamonCategoryLabel → "akka-dispatcher",
-          KamonNameLabel → dispatcherName,
-          "dispatcher_name" → dispatcherName)
-
-        result should contain theSameElementsAs
-        Seq(
-          MetricFamily(
-            "akka_fork_join_pool_dispatcher_parallelism",
-            PrometheusType.Histogram,
-            Some(AkkaForkJoinPoolDispatcherParallelismHelp),
-            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).minMaxCounter("parallelism").get), end, labels))),
-          MetricFamily(
-            "akka_fork_join_pool_dispatcher_pool_size",
-            PrometheusType.Histogram,
-            Some(AkkaForkJoinPoolDispatcherPoolSizeHelp),
-            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("pool-size").get), end, labels))),
-          MetricFamily(
-            "akka_fork_join_pool_dispatcher_active_threads",
-            PrometheusType.Histogram,
-            Some(AkkaForkJoinPoolDispatcherActiveThreadsHelp),
-            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("active-threads").get), end, labels))),
-          MetricFamily(
-            "akka_fork_join_pool_dispatcher_running_threads",
-            PrometheusType.Histogram,
-            Some(AkkaForkJoinPoolDispatcherRunningThreadsHelp),
-            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("running-threads").get), end, labels))),
-          MetricFamily(
-            "akka_fork_join_pool_dispatcher_queued_task_count",
-            PrometheusType.Histogram,
-            Some(AkkaForkJoinPoolDispatcherQueuedTaskCountHelp),
-            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("queued-task-count").get), end, labels))))
-      }
+//      "a fork join pool" in {
+//        val dispatcherName = "test-system/fork-join-pool"
+//        val forkJoinPool =  new ForkJoinPool()
+//        val tags: Map[String, String] = Map("dispatcher-type" → "fork-join-pool")
+//        Kamon.metrics.entity(ForkJoinPoolMetrics.factory(forkJoinPool, AkkaDispatcherMetrics.Category),
+//          dispatcherName, tags)
+//        val entity = Entity(dispatcherName, "akka-dispatcher", tags)
+//        val tick = snapshotOf(entity)
+//        val result = converter(tick)
+//        val labels = Map(
+//          "dispatcher_type" → "fork-join-pool",
+//          KamonCategoryLabel → "akka-dispatcher",
+//          KamonNameLabel → dispatcherName,
+//          "dispatcher_name" → dispatcherName)
+//
+//        result should contain theSameElementsAs
+//        Seq(
+//          MetricFamily(
+//            "akka_fork_join_pool_dispatcher_parallelism",
+//            PrometheusType.Histogram,
+//            Some(AkkaForkJoinPoolDispatcherParallelismHelp),
+//            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).minMaxCounter("parallelism").get), end, labels))),
+//          MetricFamily(
+//            "akka_fork_join_pool_dispatcher_pool_size",
+//            PrometheusType.Histogram,
+//            Some(AkkaForkJoinPoolDispatcherPoolSizeHelp),
+//            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("pool-size").get), end, labels))),
+//          MetricFamily(
+//            "akka_fork_join_pool_dispatcher_active_threads",
+//            PrometheusType.Histogram,
+//            Some(AkkaForkJoinPoolDispatcherActiveThreadsHelp),
+//            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("active-threads").get), end, labels))),
+//          MetricFamily(
+//            "akka_fork_join_pool_dispatcher_running_threads",
+//            PrometheusType.Histogram,
+//            Some(AkkaForkJoinPoolDispatcherRunningThreadsHelp),
+//            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("running-threads").get), end, labels))),
+//          MetricFamily(
+//            "akka_fork_join_pool_dispatcher_queued_task_count",
+//            PrometheusType.Histogram,
+//            Some(AkkaForkJoinPoolDispatcherQueuedTaskCountHelp),
+//            Seq(Metric(MetricValue.Histogram(tick.metrics(entity).gauge("queued-task-count").get), end, labels))))
+//      }
 
       "a thread pool executor" in {
         val dispatcherName = "test-system/thread-pool-executor"
