@@ -7,7 +7,7 @@ import com.monsanto.arch.kamon.prometheus.demo.{DemoSettings, LoadGenerator}
 import com.typesafe.config.ConfigFactory
 import kamon.Kamon
 import kamon.play.PlayExtension
-import kamon.play.di.KamonAPI
+import kamon.play.di.GuiceModule.KamonLoader
 import kamon.trace.Tracer
 import kamon.util.SameThreadExecutionContext
 import play.api.libs.streams.Accumulator
@@ -22,7 +22,7 @@ import play.core.server._
   */
 object Demo extends App {
   // load settings
-  val settings = new DemoSettings(ConfigFactory.load())
+  val settings = DemoSettings(ConfigFactory.load())
 
   private val filter: EssentialFilter = new EssentialFilter {
     override def apply(next: EssentialAction): EssentialAction = new EssentialAction {
@@ -58,7 +58,7 @@ object Demo extends App {
     LoggerConfigurator(environment.classLoader).foreach { _.configure(environment) }
 
     //start play Kamon
-    new KamonAPI(applicationLifecycle, environment)
+    new KamonLoader(applicationLifecycle, environment, configuration)
     //register Prometheus Play extension
     private val prometheusPlayExtension: PrometheusPlayExtension = actorSystem.registerExtension(PrometheusPlay)
 

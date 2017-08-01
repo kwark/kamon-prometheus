@@ -34,7 +34,7 @@ class PrometheusPlayExtension(val system: ExtendedActorSystem) extends Kamon.Ext
   val isBuffered: Boolean = settings.refreshInterval > Kamon.metrics.settings.tickInterval
 
   /** Listens to and records metrics. */
-  val controller: PrometheusController = new PrometheusController(settings)
+  val controller: PrometheusController = new PrometheusController(settings, system.dispatcher)
   private[wegenenverkeer] val listener = system.actorOf(PrometheusListener.props(controller), "prometheus-listener")
 
   /** If the listener needs to listen less frequently than ticks, set up a buffer. */

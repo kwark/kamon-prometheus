@@ -1,21 +1,20 @@
 import java.util.Date
 import sbtprotobuf.ProtobufPlugin
 
-val akkaVersion = "2.4.7"
-val kamonVersion = "0.6.1"
-val playVersion = "2.5.4"
+val akkaVersion = "2.5.3"
+val playVersion = "2.6.2"
 
 lazy val commonSettings = Seq(
   organization := "be.wegenenverkeer",
   licenses := Seq("BSD New" → url("http://opensource.org/licenses/BSD-3-Clause")),
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.11.11",
+  crossScalaVersions := Seq("2.11.11", "2.12.3"),
   scalacOptions ++= Seq(
     "-deprecation",
     "-unchecked"
   ),
   resolvers ++= Seq(
-    "AWV nexus releases" at "https://collab.mow.vlaanderen.be/nexus/content/repositories/releases",
-    "AWV nexus snapshot" at "https://collab.mow.vlaanderen.be/nexus/content/repositories/snapshots",
+    "Local Maven" at Path.userHome.asFile.toURI.toURL + ".m2/repository",
     Resolver.typesafeRepo("releases")
   ),
   credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
@@ -29,8 +28,9 @@ lazy val commonSettings = Seq(
 )
 
 lazy val publishSettings: Seq[Setting[_]] = Seq(
+  credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
   publishTo <<= version { (v: String) =>
-    val nexus = "https://collab.mow.vlaanderen.be/nexus/content/repositories/"
+    val nexus = "https://collab.mow.vlaanderen.be/artifacts/repository/maven-"
     if (v.trim.endsWith("SNAPSHOT"))
       Some("collab snapshots" at nexus + "snapshots")
     else
@@ -56,24 +56,24 @@ lazy val library = (project in file("library"))
     name := "kamon-prometheus",
     description := "Kamon module to export metrics to Prometheus",
     libraryDependencies ++= Seq(
-      "io.kamon"               %% "kamon-core"               % kamonVersion,
+      "io.kamon"               %% "kamon-core"               % "0.6.7",
       "com.typesafe.play"      %% "play"                     % playVersion,
       "com.typesafe.akka"      %% "akka-actor"               % akkaVersion,
-      "com.typesafe"            % "config"                   % "1.3.0",
-      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.4" % "provided",
+      "com.typesafe"            % "config"                   % "1.3.1",
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6" % "provided",
       // -- testing --
       "com.typesafe.play" %% "play-test"       % playVersion  % "test",
-      "org.scalatest"     %% "scalatest"       % "2.2.5"      % "test",
+      "org.scalatest"     %% "scalatest"       % "3.0.3"      % "test",
       "com.typesafe.akka" %% "akka-testkit"    % akkaVersion  % "test",
-      "org.scalacheck"    %% "scalacheck"      % "1.12.5"     % "test",
-      "io.kamon"          %% "kamon-akka"      % kamonVersion % "test"
+      "org.scalacheck"    %% "scalacheck"      % "1.13.5"     % "test",
+      "io.kamon"          %% "kamon-akka-2.5"  % "0.6.7"      % "test"
     ),
     dependencyOverrides ++= Set(
       "org.scala-lang"          % "scala-library" % scalaVersion.value,
       "org.scala-lang"          % "scala-reflect" % scalaVersion.value,
-      "org.scala-lang.modules" %% "scala-xml"     % "1.0.4"
+      "org.scala-lang.modules" %% "scala-xml"     % "1.0.6"
     ),
-    version in ProtobufPlugin.protobufConfig := "2.6.1",
+    version in ProtobufPlugin.protobufConfig := "3.3.1",
 
     // We have to ensure that Kamon starts/stops serially
     parallelExecution in Test := false,
@@ -91,10 +91,10 @@ lazy val demo = (project in file("demo"))
     name := "kamon-prometheus-demo",
     description := "Docker image containing a demonstration of kamon-prometheus in action.",
     libraryDependencies ++= Seq(
-      "io.kamon"          %% "kamon-system-metrics" % kamonVersion,
-      ("io.kamon"          %% "kamon-play-25"       % kamonVersion).exclude("org.asynchttpclient", "async-http-client").exclude("commons-logging", "commons-logging"),
-      "io.kamon"          %% "kamon-autoweave"      % kamonVersion,
-      "be.wegenenverkeer" %% "rxhttpclient-scala"   % "0.4.0",
+      "io.kamon"          %% "kamon-system-metrics" % "0.6.7",
+      ("io.kamon"          %% "kamon-play-2.6"      % "0.6.8").exclude("org.asynchttpclient", "async-http-client").exclude("commons-logging", "commons-logging"),
+      "io.kamon"          %% "kamon-autoweave"      % "0.6.5",
+      "be.wegenenverkeer" %% "rxhttpclient-scala"   % "0.5.2",
       "com.typesafe.play" %% "play-netty-server"    % playVersion,
       "com.typesafe.play" %% "play-logback"         % playVersion
     ),
